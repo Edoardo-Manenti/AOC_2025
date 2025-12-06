@@ -35,7 +35,7 @@ class AocSolver():
         ranges = self.squash_ranges(ranges)
 
         return sum(1 
-            if any(id in range(a,b+1) for a,b in ranges) 
+            if any(a<=id<=b for a,b in ranges) 
             else 0 
             for id in ids)
 
