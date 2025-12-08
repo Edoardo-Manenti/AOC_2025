@@ -1,78 +1,60 @@
 import timeit
 import unittest
-import heapq
-from collections import defaultdict, Counter
 
 class AocSolver():
 
     def setup(self, input_file_path = 'input.txt') -> str:
-        self.circuits = defaultdict(int)
-        self.connections = set()
-        self.id = 1
-        self.pq = []
-        input = open("input.txt", "r").read()
-        self.boxes = [tuple(line.split(",")) for line in input.split()]
-        self.build_pq()
+        return open("input.txt", "r").read()
+
+    def init(self):
+        self.boxes = [list(map(int, line.split(','))) for line in self.input.split()]
+        self.N = len(self.boxes)
+        self.parents = list(range(self.N))
+        self.sizes = [1]*self.N
+        self.pq = [(self.dist(self.boxes[i], self.boxes[j]), i, j) 
+            for i in range(self.N) for j in range(i+1, self.N)]
+        self.pq.sort(key=lambda item: item[0], reverse=True)
+
+    def find(self, a):
+        if self.parents[a] != a:
+            self.parents[a] = self.find(self.parents[a])
+        return self.parents[a]
+
+    def union(self, a,b):
+        a,b = self.find(a), self.find(b)
+
+        if a == b:
+            return
+        if self.sizes[b] > self.sizes[a]:
+            a,b = b,a
+
+        self.parents[b] = a
+
+        self.sizes[a] += self.sizes[b]
+        self.sizes[b] = 0
 
     def dist(self, a, b):
         return sum(abs(int(x1)-int(x2))**2 for x1,x2 in zip(a, b))
 
-    def build_pq(self):
-        for i,box1 in enumerate(self.boxes):
-            for j, box2 in enumerate(self.boxes):
-                if i == j:
-                    continue
-                dist = self.dist(box1, box2)
-                heapq.heappush(self.pq, (dist, (i,j)))
-
-    def next_closest_connection(self):
-            while self.pq:
-                conn = heapq.heappop(self.pq)
-                if conn[1] not in self.connections:
-                    return conn[1]
-
-    def connect(self, connection):
-        b1,b2 = connection
-        self.connections.add((b1,b2))
-        self.connections.add((b2,b1))
-        if self.circuits[b1] != 0:
-            if self.circuits[b2] != 0:
-                v1,v2 = self.circuits[b1], self.circuits[b2]
-                for k,v in self.circuits.items():
-                    if v == v1 or v == v2:
-                        self.circuits[k] = self.id
-                self.id +=1
-            else:
-                self.circuits[b2] = self.circuits[b1]
-        else:
-            if self.circuits[b2] != 0:
-                self.circuits[b1] = self.circuits[b2]
-            else:
-                self.circuits[b1] = self.id
-                self.circuits[b2] = self.id
-                self.id +=1
-
-    def part_one(self, iterations: int) -> int:
+    def part_one(self, input, iterations: int) -> int:
+        self.input = input
+        self.init()
         for _ in range(iterations):
-            connection = self.next_closest_connection()
-            self.connect(connection)
+            dist, a, b = self.pq.pop()
+            self.union(a, b)
 
-        res = Counter(v for k,v in self.circuits.items())
-        res = [v for k,v in sorted(res.items(), key=lambda item: item[1])]
-        return res[-1]*res[-2]*res[-3]
+        self.sizes.sort(reverse = True)
+        return self.sizes[0]*self.sizes[1]*self.sizes[2]
 
-    def part_two(self) -> int:
-        last_connection = None
-        while len(self.circuits.keys()) < len(self.boxes) \
-            or \
-            len(set(self.circuits.values())) > 1:
-            connection = self.next_closest_connection()
-            self.connect(connection)
-            last_connection = connection
+    def part_two(self, input) -> int:
+        self.input = input
+        self.init()
+        while True:
+            dist, a, b = self.pq.pop()
+            self.union(a, b)
 
-        b1 = self.boxes[last_connection[0]]
-        b2 = self.boxes[last_connection[1]]
-        return [int(a)*int(b) for a,b in zip(b1,b2)][0]
+            if self.sizes[self.find(a)] == self.N:
+                return self.boxes[a][0]*self.boxes[b][0]
 
 class AocSolutionTest(unittest.TestCase):
     def setUp(self):
@@ -127,13 +109,13 @@ class AocSolutionTest(unittest.TestCase):
         self.solver = AocSolver()
 
     def test_part_one(self):
-        value = self.solver.part_one(10)
+        value = self.solver.part_one(self.test_part_one, 10)
 
         self.assertIsNotNone(value)
         self.assertEqual(value, self.solution_part_one)
 
     def test_part_two(self):
-        value = self.solver.part_two()
+        value = self.solver.part_two(self.test_part_two)
 
         self.assertIsNotNone(value)
         self.assertEqual(value, self.solution_part_two)
@@ -147,13 +129,13 @@ problem = solver.setup()
     iterations = 1
     print(f"Time for part1: {
     timeit.timeit(setup=setup, 
-                  stmt='print(solver.part_one(1000))', 
+                  stmt='print(solver.part_one(problem,1000))', 
                   number = iterations)
                   /iterations
     } sec")
     print(f"Time for part2: {
     timeit.timeit(setup=setup, 
-                  stmt='print(solver.part_two())', 
+                  stmt='print(solver.part_two(problem))', 
                   number = iterations)
                   /iterations
     } sec")
