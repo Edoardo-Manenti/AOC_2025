@@ -1,117 +1,78 @@
 import timeit
 import unittest
-from collections import defaultdict
-from collections import Counter
-from functools import reduce
+import heapq
+from collections import defaultdict, Counter
 
 class AocSolver():
 
     def setup(self, input_file_path = 'input.txt') -> str:
-        return open("input.txt", "r").read()
+        self.circuits = defaultdict(int)
+        self.connections = set()
+        self.id = 1
+        self.pq = []
+        input = open("input.txt", "r").read()
+        self.boxes = [tuple(line.split(",")) for line in input.split()]
+        self.build_pq()
 
     def dist(self, a, b):
         return sum(abs(int(x1)-int(x2))**2 for x1,x2 in zip(a, b))
 
-    def matrix_distances(self, boxes):
-        md = [[0 for _ in boxes] for _ in boxes]
-        for i,box1 in enumerate(boxes):
-            for j, box2 in enumerate(boxes):
+    def build_pq(self):
+        for i,box1 in enumerate(self.boxes):
+            for j, box2 in enumerate(self.boxes):
                 if i == j:
-                    md[i][j] = float('inf')
                     continue
-                md[i][j] = self.dist(box1, box2)
-        return md
+                dist = self.dist(box1, box2)
+                heapq.heappush(self.pq, (dist, (i,j)))
 
+    def next_closest_connection(self):
+            while self.pq:
+                conn = heapq.heappop(self.pq)
+                if conn[1] not in self.connections:
+                    return conn[1]
 
-    def part_one(self, input: str) -> int:
-        boxes = [tuple(line.split(",")) for line in input.split()]
-        circuits = defaultdict(int)
-        connections = set()
-        id = 1
-        md = self.matrix_distances(boxes)
-
-        for i in range(10):
-            dist = float('inf')
-            b1,b2 = None, None
-            for i,r in enumerate(md):
-                for j,c in enumerate(r):
-                    if i == j:
-                        continue
-                    if (boxes[i],boxes[j]) in connections:
-                        continue
-                    if (boxes[j],boxes[i]) in connections:
-                        continue
-                    if c < dist:
-                        dist = c
-                        b1,b2 = boxes[i], boxes[j]
-            connections.add((b1,b2))
-            connections.add((b2,b1))
-            if circuits[b1] != 0:
-                if circuits[b2] != 0:
-                    v1,v2 = circuits[b1], circuits[b2]
-                    for k,v in circuits.items():
-                        if v == v1 or v == v2:
-                            circuits[k] = id
-                    id +=1
-                else:
-                    circuits[b2] = circuits[b1]
+    def connect(self, connection):
+        b1,b2 = connection
+        self.connections.add((b1,b2))
+        self.connections.add((b2,b1))
+        if self.circuits[b1] != 0:
+            if self.circuits[b2] != 0:
+                v1,v2 = self.circuits[b1], self.circuits[b2]
+                for k,v in self.circuits.items():
+                    if v == v1 or v == v2:
+                        self.circuits[k] = self.id
+                self.id +=1
             else:
-                if circuits[b2] != 0:
-                    circuits[b1] = circuits[b2]
-                else:
-                    circuits[b1] = id
-                    circuits[b2] = id
-                    id +=1
+                self.circuits[b2] = self.circuits[b1]
+        else:
+            if self.circuits[b2] != 0:
+                self.circuits[b1] = self.circuits[b2]
+            else:
+                self.circuits[b1] = self.id
+                self.circuits[b2] = self.id
+                self.id +=1
 
-        res = Counter(v for k,v in circuits.items())
+    def part_one(self, iterations: int) -> int:
+        for _ in range(iterations):
+            connection = self.next_closest_connection()
+            self.connect(connection)
+
+        res = Counter(v for k,v in self.circuits.items())
         res = [v for k,v in sorted(res.items(), key=lambda item: item[1])]
         return res[-1]*res[-2]*res[-3]
 
-    def part_two(self, input: str) -> int:
-        boxes = [tuple(line.split(",")) for line in input.split()]
-        circuits = defaultdict(int)
-        connections = set()
-        id = 1
-        md = self.matrix_distances(boxes)
+    def part_two(self) -> int:
         last_connection = None
+        while len(self.circuits.keys()) < len(self.boxes) \
+            or \
+            len(set(self.circuits.values())) > 1:
+            connection = self.next_closest_connection()
+            self.connect(connection)
+            last_connection = connection
 
-        while len(boxes) != len(circuits.keys()) \
-            or (set(circuits.values()) == set([0]) \
-                 or len(set(circuits.values())) != 1):
-            dist = float('inf')
-            b1,b2 = None, None
-            for i,r in enumerate(md):
-                for j,c in enumerate(r):
-                    if i == j:
-                        continue
-                    if (boxes[i],boxes[j]) in connections:
-                        continue
-                    if (boxes[j],boxes[i]) in connections:
-                        continue
-                    if c < dist:
-                        dist = c
-                        b1,b2 = boxes[i], boxes[j]
-            connections.add((b1,b2))
-            connections.add((b2,b1))
-            last_connection = (b1,b2)
-            if circuits[b1] != 0:
-                if circuits[b2] != 0:
-                    v1,v2 = circuits[b1], circuits[b2]
-                    for k,v in circuits.items():
-                        if v == v1 or v == v2:
-                            circuits[k] = id
-                    id +=1
-                else:
-                    circuits[b2] = circuits[b1]
-            else:
-                if circuits[b2] != 0:
-                    circuits[b1] = circuits[b2]
-                else:
-                    circuits[b1] = id
-                    circuits[b2] = id
-                    id +=1
-
-        return int(last_connection[0][0])*int(last_connection[1][0])
+        b1 = self.boxes[last_connection[0]]
+        b2 = self.boxes[last_connection[1]]
+        return [int(a)*int(b) for a,b in zip(b1,b2)][0]
 
 class AocSolutionTest(unittest.TestCase):
     def setUp(self):
@@ -166,13 +127,13 @@ class AocSolutionTest(unittest.TestCase):
         self.solver = AocSolver()
 
     def test_part_one(self):
-        value = self.solver.part_one(self.test_part_one)
+        value = self.solver.part_one(10)
 
         self.assertIsNotNone(value)
         self.assertEqual(value, self.solution_part_one)
 
     def test_part_two(self):
-        value = self.solver.part_two(self.test_part_two)
+        value = self.solver.part_two()
 
         self.assertIsNotNone(value)
         self.assertEqual(value, self.solution_part_two)
@@ -186,13 +147,13 @@ problem = solver.setup()
     iterations = 1
     print(f"Time for part1: {
     timeit.timeit(setup=setup, 
-                  stmt='print(solver.part_one(problem))', 
+                  stmt='print(solver.part_one(1000))', 
                   number = iterations)
                   /iterations
     } sec")
     print(f"Time for part2: {
     timeit.timeit(setup=setup, 
-                  stmt='print(solver.part_two(problem))', 
+                  stmt='print(solver.part_two())', 
                   number = iterations)
                   /iterations
     } sec")
