@@ -33,12 +33,12 @@ class AocSolver():
             key, values = line.split(':')
             self.tree[key.strip()] = values.strip().split(' ')
 
-        svr_dac,_ = self.bfs('svr', 'dac', {})
+        svr_dac,dp = self.bfs('svr', 'dac', {})
+        fft_dac,_ = self.bfs('fft', 'dac', dp)
         svr_fft,_ = self.bfs('svr', 'fft', {})
+        dac_fft,dp = self.bfs('dac', 'fft', dp)
         dac_out,_ = self.bfs('dac', 'out', {})
-        dac_fft,_ = self.bfs('dac', 'fft', {})
-        fft_dac,_ = self.bfs('fft', 'dac', {})
-        fft_out,_ = self.bfs('fft', 'out', {})
+        fft_out,dp = self.bfs('fft', 'out', dp)
 
         return svr_dac*dac_fft*fft_out + svr_fft*fft_dac*dac_out
 
